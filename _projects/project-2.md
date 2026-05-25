@@ -1,101 +1,161 @@
 ---
-title: "X1 打乒乓球 - ACT & VLASH π0.5 项目"
-excerpt: 一个关于X1机器人打乒乓球的项目，使用了两种主流的vla模型训练
+title: "LeRobot ACT - 单臂抓取任务全流程"
+excerpt: 基于 LeRobot 框架与 ACT 模型的单臂物体抓取项目，涵盖遥操数据采集、HDF5→LeRobot 格式转换、模型训练、模拟推理与实机部署的完整链路。
 collection: projects
 ---
 
-<video controls preload="metadata" style="width: 100%; max-width: 800px; display: block; margin: 0 auto 1.5em auto;">
-  <source src="/files/videos/X1_ACT_pingpong_demo.mp4" type="video/mp4">
-  你的浏览器不支持 video 标签。
-</video>
+<div style="display: flex; flex-wrap: wrap; gap: 1em; margin: 0 auto 1.5em auto; max-width: 900px;">
+  <video controls preload="metadata" style="flex: 1 1 360px; width: 100%; max-width: 100%;">
+    <source src="/files/videos/pick_cube_demo1.mp4" type="video/mp4">
+    你的浏览器不支持 video 标签。
+  </video>
+  <video controls preload="metadata" style="flex: 1 1 360px; width: 100%; max-width: 100%;">
+    <source src="/files/videos/pick_cube_demo2.mp4" type="video/mp4">
+    你的浏览器不支持 video 标签。
+  </video>
+</div>
 
 ## 项目描述
 
-本项目在开展了两条路线，第一条是用**模仿学习ACT**进行训练以及部署，第二条则选择了**VLASH（基于pi05**） 的LoRA微调，针对 **X1 7-DOF 进行的打乒乓任务**，这里数据采集了（30 Hz、151 episodes）。
+本项目在 **LeRobot 框架** 下完成一个单臂"抓取并放置"任务（pick_cube）的完整闭环：从遥操数据采集、格式转换、ACT 模型训练，到模拟推理验证与实机部署调参。任务相对简单，仅采集 50 条数据即可达到不错的效果。
 
-> 配置来源：
-> - 训练（带深度）：`x1_pingpong_lora.yaml`
-> - 训练（纯 RGB）：`x1_pingpong_lora_rgbonly.yaml`
-> - 推理：`inference_pingpong.yaml`
-> - 模型默认：`vlash/policies/pi05/configuration_pi05.py`
+## 1. 数据采集
 
-## 1. 模型骨架
+任务初期发现 LeRobot 自带的遥操控制频率偏低，主从臂操作明显卡顿，会显著影响采集速率与数据质量。因此**另外开发了一套数采代码**，便于排查问题、提高采集帧率。
 
-| 参数 | 值 | 作用 |
+### Teleop 文件夹结构
+
+```
+Teleop/
+├── convert_data/                      # 转换好的数据（lerobot 格式）
+├── data/                              # 原始录制数据（hdf5 格式）
+├── data1/                             # 备份数据目录
+├── hdf5_to_lerobot_converter/         # HDF5 → LeRobot 3.0 转换工具
+├── onero_description/                 # 机械臂模型文件
+├── teleop_config.yml                  # 遥操作配置文件（遥操、录制共用）
+├── teleop_controller.py               # 主从臂遥操函数与工具
+├── teleop_main.py                     # 遥操主程序
+├── teleop_record_hdf5.py              # 数据采集主程序
+└── visualize_hdf5.py                  # 数据可视化检查
+```
+
+> **数据量参考**：本任务比较简单，**仅采集 50 条数据**就足以训练出可用模型。复杂任务可按需加量。
+
+## 2. 模型训练
+
+训练前需要安装好 LeRobot，可参考以下教程完成完整环境配置：
+
+- 使用开源数据在云服务器训练 ACT
+- LeRobot (ROS2) ACT 本地数采-本地训练-单机部署完整流程
+- lerobot-ACT 本地训练部署流程
+
+### 训练命令
+
+参数可以直接命令行传入，也可以写到配置文件里。训练过程用 **wandb** 实时监控。
+
+```bash
+lerobot-train \
+  --dataset.repo_id=test \
+  --dataset.root=/home/woan/Teleop2/convert_data/pick_cube \
+  --dataset.revision=v3.0 \
+  --dataset.streaming=false \
+  --policy.type=act \
+  --output_dir=output_lerobot_train/act \
+  --job_name=pick_cube \
+  --policy.device=cuda \
+  --wandb.enable=true \
+  --wandb.project=Lerobot_xuanzi_Project \
+  --policy.push_to_hub=false \
+  --steps=50000 \
+  --batch_size=16
+```
+
+ACT 模型完整参数详见：
+
+```
+~lerobot/src/lerobot/policies/act/configuration_act.py
+```
+
+不同任务可在此基础上调优。
+
+### 模拟推理（部署前验证）
+
+实机部署前先用已有视频对训练出的模型做模拟推理。**好处是部署遇到问题时，可以优先排除"模型本身是否训坏"这一项**。
+
+```bash
+python simulate_episode_video_inference.py \
+  --model-path output_lerobot_train/act/checkpoints/last \
+  --episode-index 5 \
+  --max-frames 600 \
+  --export-compare-video outputs/ep5_compare.mp4 \
+  --save-actions outputs/ep5_actions.npy
+```
+
+观察导出的 compare 视频，**模型预测轨迹与真实轨迹的运动趋势一致** → 可以进入下一步部署。
+
+## 3. 模型部署
+
+### 3.1 模型文件结构
+
+每 20k step 保存一次 checkpoint
+
+### 3.2 部署配置与运行
+
+推理用 `record_config.yml`。**ACT 模型参数量小，普通笔记本即可推理**。本任务只用了一个 RGB 相机（顶部 `head` 位置）.
+```bash
+lerobot-record --config_path=tmp/eval_config.yml
+```
+
+### 3.3 机械臂初始位姿
+
+部署前必须确认初始位姿：
+
+```yaml
+home_joints_positions: [0, 0., 0, 0, 0., 0, 0]
+```
+
+默认全 0 → 机械臂初始化为**垂直向下**姿态。
+
+```yaml
+ready_waypoints:
+  - [-0.523, -1.568,  0.001, -0.006,  0.127,  0.161, 0.000]
+  - [-0.404, -1.451,  0.379,  1.531,  0.116, -0.150, 0.000]
+  - [-0.291, -0.195,  0.066,  1.736,  0.011, -0.325, 0.000]
+```
+
+机械臂初始化后会**依次经过这三个航点**到达准备姿态。
+
+
+### 3.4 部署参数微调（关键）
+
+`eval_config.yml` 里有两行关键参数：
+
+| 参数 | 默认 | 调优后 |
 |---|---|---|
-| `paligemma_variant` | `gemma_2b` | 视觉-语言主干（PaliGemma + SigLIP），≈3B 参数 |
-| `action_expert_variant` | `gemma_300m` | 动作专家小模型 |
-| VLM hidden / inter / layers | 2048 / 16384 / 18 | Gemma-2B 文本侧 |
-| Action expert hidden / inter / layers | 1024 / 4096 / 18 | 动作侧 |
-| `image_resolution` | 224×224 | 网络输入分辨率（原始相机 480×640 / 320×240 通过 resize-with-pad 进入） |
-| `max_state_dim` / `max_action_dim` | 32 / 32 | 状态/动作向量都 pad 到 32 维（X1 是 7-DOF，剩 25 维 pad） |
-| `tokenizer_max_length` | 200 | 任务文本最长 token 数 |
-| `dtype` | `bfloat16` | 计算精度 |
-| `use_adarms`（action expert） | `True` | **π0.5 关键设计**：用 AdaRMSNorm 把状态/时间作为条件注入 |
+| `n_action_steps` | `80` | `1` |
+| `temporal_ensemble_coeff` | `null`（不启用） | `0.01` |
 
-## 2. 动作生成 / Flow Matching（π0.5 默认）
 
-| 参数 | 值 | 作用 |
-|---|---|---|
-| `chunk_size` | 50 |
-| `n_action_steps` | 50 |
-| `num_inference_steps` | 10 |
-| `time_sampling_beta_alpha / beta` | 1.5 / 1.0 | 训练时 t 服从 Beta(1.5, 1.0)，偏向高噪声 |
-| `time_sampling_scale / offset` | 0.999 / 0.001 |
-| `min_period / max_period` | 4e-3 / 4.0 |
+**调优后**：
+- 开启 ACT 的 **时序融合机制**（`temporal_ensemble_coeff = 0.01`）
+- `n_action_steps` **必须设为 1**（与时序融合互斥）
+- 系数也可以是 `-0.01`，但实测效果不如 `0.01`
 
-## 3. 任务输入定制
+调优后**推理异常丝滑**，机械臂动作明显更连贯。
 
-| 参数 | 值 | 备注 |
-|---|---|---|
-| `policy.type` | `pi05` | |
-| `pretrained_path` | `/mnt/data/pi05_base` |
-| `state_cond` | `true` | **打开 π0.5 的状态条件 AdaRMSNorm**，作者说"显著提升稳定性"，对乒乓这种状态敏感任务尤其重要 |
-| `empty_cameras` | `2` | 补 2 个空相机占位（left_wrist + right_wrist），与 pi05_base 预训练数据布局对齐，避免分布漂移 |
-| `dataset.repo_id / root` | `local/x1_pingpong` / `/mnt/workspace/data/20260226` | LeRobot v3.0 本地数据：151 episodes、30 Hz、7-DOF |
-| `single_task` | 不传（任务文本写在 `tasks.parquet`） | |
-| `normalization` | STATE / ACTION → `MEAN_STD`，VISUAL → `IDENTITY` | π0.5 默认（注释写 `MEAN_STD` 比 `QUANTILES` 更稳） |
+## 4. 总结
 
-## 4. 训练超参（**调过**）
+### 任务总结
 
-| 参数 | 带深度版 / RGB-only 版 | 备注 |
-|---|---|---|
-| `batch_size` | 1 / 2 | RGB-only 翻倍利用显存 |
-| `grad_accum_steps` | 4 / 2 | 全局有效 batch 都是 16（4 卡 × 4 / 4 卡 × 2 × 2） |
-| `steps` | 20000 | 比 vlash 默认 50000 缩短，因为只 43k 帧 |
-| `num_workers` | 4 | |
-| `seed` | 1000 | |
-| `optimizer.type` | `adamw` | |
-| `optimizer.lr` | `5e-5` | 比 π0.5 默认 `2.5e-5` 高 1 倍（LoRA 微调常见做法） |
-| `optimizer.betas` | `[0.9, 0.95]` | π0.5 默认 |
-| `optimizer.weight_decay` | `1e-10` | **几乎关掉**（避免把低秩适配器拉回零） |
-| `scheduler.type` | `cosine_decay_with_warmup` | |
-| `num_warmup_steps` | 500 | 比默认 1000 短，配合短训练 |
-| `peak_lr → decay_lr` | `5e-5 → 2.5e-6` | 衰减 20×，标准 cosine |
-| `num_decay_steps` | 20000 | 与 steps 对齐 |
-| `save_freq` / `log_freq` | 2000 / 100 | 多存 checkpoint 方便挑 |
+对于**任务简单、时长较短**的抓取放置任务，即使在杂乱环境下（不推荐，会拖累泛化），仅 50 条数据就能取得不错的效果。本次任务抓取的是茶水间的溜溜梅塑料桶——**反光效果较强**，推测 ResNet 对其纹理特征提取明显，间接帮助了视觉定位。
 
-## 5. VLASH 特有设计（论文特殊设计）
+### 问题分析：位置泛化弱
 
-| 参数 | 值 | 备注 |
-|---|---|---|
-| `max_delay_steps` | **8** | **时延增广**：训练时 query 区间随机往后偏移 0~8 步，让模型学会"基于陈旧观测预测未来动作"，这是异步推理无开销的前提 |
-| `shared_observation` | **true** | **共享观测**：一次前向把 9 个 offset 分支并行算（自定义注意力 mask 防跨支泄露），相比朴素做法约 9× 提速 |
-| 异步推理（推理 yaml） | `inference_overlap_steps: 3` | 推理重叠 3 步，覆盖 ≈38 ms 延迟 |
-| 动作量化（推理 yaml） | `action_quant_ratio: 1` | 这里没开（= 1 表示不量化） |
+实测发现：**当物块放在没采集过的位置时，机械臂无法到达**。
 
-## 6. LoRA 配置（参照官方微调）
+这是**模仿学习的通病**——在模型层面调整收益甚微。
 
-| 参数 | 值 | 备注 |
-|---|---|---|
-| `enable` / `backend` | `true` / `peft` | 使用 HuggingFace PEFT |
-| `r` | 16 | 低秩矩阵秩 |
-| `alpha` | 16 | 缩放系数（α/r = 1.0） |
-| `dropout` | 0 | LoRA 层不 dropout |
-| `target_modules`（**注入 LoRA 的层**） | `q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj, out_proj, fc1, fc2` | 覆盖 Gemma（`*_proj`）和 SigLIP（`out_proj / fc1 / fc2`）所有线性层 |
-| `extra_trainable_modules`（**全量训练的层**） | `action_in_proj, action_out_proj, time_mlp_in, time_mlp_out, state_proj, state_mlp_in, state_mlp_out, embeddings, input_layernorm, post_attention_layernorm` | **核心点**：动作/状态/时间投影 + LayerNorm + embeddings 全量训。任务相关的"非 VLM 部分"留给全参更新，VLM 大头用 LoRA |
-| `use_qlora` | `false`（默认） | 没开 4-bit 量化 |
-
-## 7. 推理端关键参数
-
-| 待续..
+| 解决方向 | 具体做法 |
+|---|---|
+| **短期** | 采集更完善的数据集，让抓取分布覆盖整个桌面；或对现有数据做增强 |
+| **长期** | 增加腕部相机（**头部 + 腕部双相机**）以提供闭环视觉；或更换更强的模型（如 VLA 类） |
