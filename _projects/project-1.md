@@ -1,14 +1,18 @@
 ---
-title: "Roboarm_v1 - 机器人 Pick-and-Place 系统"
+title: "Roboarm - AI智能机器人系统"
 excerpt: "智能机器人系统,支持中英文语音指令控制的物体抓取与放置,集成 YOLO 视觉检测、SenseVoice 语音识别与机械臂串口控制。<br/>"
 collection: projects
 ---
+
+<video controls preload="metadata" style="width: 100%; max-width: 800px; display: block; margin: 0 auto 1.5em auto;">
+  <source src="/files/videos/roboarm_demo.mp4" type="video/mp4">
+  你的浏览器不支持 video 标签。
+</video>
 
 ## 项目描述
 
 Roboarm_v1 是一个智能机器人系统,支持语音控制的物体抓取和放置操作。该系统集成了计算机视觉、语音识别、自然语言处理和机械臂控制等技术,能够通过中英文语音指令控制机器人进行智能操作。
 
-参考文档:[AI Roboticarm 项目文档(飞书)](#)
 
 ## 主要功能
 
@@ -24,7 +28,6 @@ Roboarm_v1 是一个智能机器人系统,支持语音控制的物体抓取和�
 ### 环境要求
 
 - Python 3.8+
-- ROS 2(推荐 Humble 或更高版本)(暂未配置)
 - CUDA(可选,用于 GPU 加速)(这里仅用 CPU)
 
 ### 依赖安装
@@ -156,6 +159,3 @@ version1/
 - 摄像头需要正确配置(默认设备 `0`)
 - 首次运行时可能需要标定相机外参
 
-## 贡献
-
-欢迎提交 Issue 和 Pull Request!

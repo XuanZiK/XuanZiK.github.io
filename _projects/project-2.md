@@ -3,6 +3,11 @@ title: "X1 打乒乓球 - ACT & VLASH π0.5 项目"
 collection: projects
 ---
 
+<video controls preload="metadata" style="width: 100%; max-width: 800px; display: block; margin: 0 auto 1.5em auto;">
+  <source src="/files/videos/A1_ACT_pingpong_demo.mp4" type="video/mp4">
+  你的浏览器不支持 video 标签。
+</video>
+
 ## 项目描述
 
 本项目在开展了两条路线，第一条是用**模仿学习ACT**进行训练以及部署，第二条则选择了**VLASH（基于pi05**） 的LoRA微调，针对 **X1 7-DOF 进行的打乒乓任务**，这里数据采集了（30 Hz、151 episodes）。
