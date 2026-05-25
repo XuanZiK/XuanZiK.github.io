@@ -1,10 +1,11 @@
 ---
 title: "X1 打乒乓球 - ACT & VLASH π0.5 项目"
+excerpt: 一个关于X1机器人打乒乓球的项目，使用了两种主流的vla模型训练
 collection: projects
 ---
 
 <video controls preload="metadata" style="width: 100%; max-width: 800px; display: block; margin: 0 auto 1.5em auto;">
-  <source src="/files/videos/A1_ACT_pingpong_demo.mp4" type="video/mp4">
+  <source src="/files/videos/X1_ACT_pingpong_demo.mp4" type="video/mp4">
   你的浏览器不支持 video 标签。
 </video>
 
@@ -45,7 +46,7 @@ collection: projects
 
 ## 3. 任务输入定制
 
-| 参数 | 值 | 含义 |
+| 参数 | 值 | 备注 |
 |---|---|---|
 | `policy.type` | `pi05` | |
 | `pretrained_path` | `/mnt/data/pi05_base` |
@@ -76,7 +77,7 @@ collection: projects
 
 ## 5. VLASH 特有设计（论文特殊设计）
 
-| 参数 | 值 | 含义 |
+| 参数 | 值 | 备注 |
 |---|---|---|
 | `max_delay_steps` | **8** | **时延增广**：训练时 query 区间随机往后偏移 0~8 步，让模型学会"基于陈旧观测预测未来动作"，这是异步推理无开销的前提 |
 | `shared_observation` | **true** | **共享观测**：一次前向把 9 个 offset 分支并行算（自定义注意力 mask 防跨支泄露），相比朴素做法约 9× 提速 |
@@ -85,7 +86,7 @@ collection: projects
 
 ## 6. LoRA 配置（参照官方微调）
 
-| 参数 | 值 | 作用 |
+| 参数 | 值 | 备注 |
 |---|---|---|
 | `enable` / `backend` | `true` / `peft` | 使用 HuggingFace PEFT |
 | `r` | 16 | 低秩矩阵秩 |
@@ -97,11 +98,4 @@ collection: projects
 
 ## 7. 推理端关键参数
 
-| 参数 | 值 | 备注 |
-|---|---|---|
-| `n_action_steps` | 50 | 一次推理执行整段 |
-| `compile_model` | `true` | `torch.compile`（`max-autotune` 模式） |
-| `fuse_qkv` / `fuse_gate_up` | `true` / `true` | 推理算子融合，对延迟敏感 |
-| `inference_overlap_steps` | 3 | 异步重叠步数 |
-| `action_quant_ratio` | 1 | 不量化（演示稳健，可改 2 演示 2× 加速） |
-| `fps` | 30 | 与训练数据一致 |
+| 待续..
