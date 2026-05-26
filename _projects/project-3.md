@@ -91,6 +91,8 @@ python simulate_episode_video_inference.py \
   --save-actions outputs/ep5_actions.npy
 ```
 
+<img src="/images/projects/compare.png" alt="模拟推理对比图" style="width: 100%; max-width: 800px; display: block; margin: 1em auto;" />
+
 观察导出的 compare 视频，**模型预测轨迹与真实轨迹的运动趋势一致** → 可以进入下一步部署。
 
 ## 3. 模型部署
