@@ -4,7 +4,7 @@ excerpt: 在 Aubo 机械臂上用 π0.5 (VLA) 的 LoRA 微调实现螺母堆叠�
 collection: projects
 ---
 
-<video controls preload="metadata" style="width: 100%; max-width: 800px; display: block; margin: 0 auto 1.5em auto;">
+<video controls preload="metadata" style="width: 100%; max-width: 360px; display: block; margin: 0 auto 1.5em auto;">
   <source src="/files/videos/aubo_stack_nut_demo.mp4" type="video/mp4">
   你的浏览器不支持 video 标签。
 </video>
